@@ -1,3 +1,5 @@
+package structure
+
 trait DLObject
 
 class Concept extends DLObject

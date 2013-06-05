@@ -1,3 +1,6 @@
+import structure._
+import logic._
+
 object Test {
 
   def main(args: Array[String]) = {
@@ -15,5 +18,7 @@ object Test {
     println(q)
     val q1 = q.replace(atom1,atom3)
     println(q1)
+    val ont = PerfReformulator.loadOntology("pizza.owl")
+    PerfReformulator.insertAboxAssertions(ont)
   }
 }

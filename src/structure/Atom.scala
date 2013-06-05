@@ -1,3 +1,5 @@
+package structure
+
 trait Atom
 
 class Unary(name: String, e: Entry) extends Atom {

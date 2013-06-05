@@ -1,3 +1,5 @@
+package structure
+
 class Query(head: Nary, body: List[Atom]) {
   
   def contains(atom: Atom) = body.contains(atom)
