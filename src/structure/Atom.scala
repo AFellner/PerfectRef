@@ -6,8 +6,8 @@ import logic.PerfReformulator
 import scala.collection.JavaConversions._
 
 trait Atom {
-  def applicable(pI: (OWLObject,OWLObject), ontology: OWLOntology):Boolean
-  def apply(pI: (OWLObject,OWLObject), ontology: OWLOntology):Atom
+  def applicable(pI: OWLAxiom, ontology: OWLOntology):Boolean
+  def apply(pI: OWLAxiom, ontology: OWLOntology):Atom
 }
 
 class Unary(ofclass: OWLClass, e: Entry) extends Atom {
@@ -15,20 +15,30 @@ class Unary(ofclass: OWLClass, e: Entry) extends Atom {
   def getOWLClass:OWLClass = ofclass
   def getEntry = e
   def ==(other:Unary) = ofclass == other.getOWLClass && e == other.getEntry
-  def applicable(pI: (OWLObject,OWLObject),ontology: OWLOntology):Boolean = {
-    return (pI._2 == ofclass)
+  def applicable(pI: OWLAxiom,ontology: OWLOntology):Boolean = {
+    if (pI.isInstanceOf[OWLSubClassOfAxiom]) {
+      return pI.asInstanceOf[OWLSubClassOfAxiom].getSuperClass == ofclass
+    }
+    else
+      return false
   }
   
   //applicable has to be checked before calling this method
   //todo: deal with inverses properly!
-  def apply(pI: (OWLObject,OWLObject), ontology: OWLOntology):Atom = {
-    if (pI._1.isInstanceOf[OWLClass]) return new Unary(pI._1.asInstanceOf[OWLClass],e)
-    else if (pI._1.isInstanceOf[OWLObjectSomeValuesFrom]) {
-      PerfReformulator.incVC
-      val newVar = new Var("x_"+PerfReformulator.getVC)
-      return new Binary(pI._1.asInstanceOf[OWLObjectSomeValuesFrom].getObjectPropertiesInSignature.toList.get(0),e,newVar)
+  def apply(pI: OWLAxiom, ontology: OWLOntology):Atom = {
+    if (pI.isInstanceOf[OWLSubClassOfAxiom]) {
+      val left = pI.asInstanceOf[OWLSubClassOfAxiom].getSubClass
+      if (left.isInstanceOf[OWLClass]) return new Unary(left.asInstanceOf[OWLClass],e)
+      else if (left.isInstanceOf[OWLObjectSomeValuesFrom]) {
+        PerfReformulator.incVC
+        val newVar = new Var("x_"+PerfReformulator.getVC)
+        val leftPropertyExpr = left.asInstanceOf[OWLObjectSomeValuesFrom].getProperty
+        val prop = leftPropertyExpr.getNamedProperty()
+        return if (leftPropertyExpr.isInstanceOf[OWLObjectInverseOf]) new Binary(prop,newVar,e) else new Binary(prop,e,newVar)
+      }
+      else return this
     }
-    return this
+    else return this
   }
 }
 
@@ -38,40 +48,71 @@ class Binary(ofproperty: OWLObjectProperty, e1: Entry, e2: Entry) extends Atom {
   def getEntry1 = e1
   def getEntry2 = e2
   def ==(other:Binary) = (ofproperty == other.getOWLOBjectProperty) && (e1 == other.getEntry1) && (e2 == other.getEntry2)
-  def applicable(pI: (OWLObject,OWLObject), ontology: OWLOntology):Boolean = {
+  def applicable(pI: OWLAxiom, ontology: OWLOntology):Boolean = {
     
     //(3)I is a role inclusion assertion and its right-hand side is either P or P-
-    if (pI._2.isInstanceOf[OWLObjectProperty])
+    if (pI.isInstanceOf[OWLSubObjectPropertyOfAxiom])
     {
-      if (pI._2 == ofproperty) return true
-      if (pI._2.asInstanceOf[OWLObjectProperty].getInverses(ontology).contains(ofproperty)) return true
+      val propInclusionAxiom = pI.asInstanceOf[OWLSubObjectPropertyOfAxiom]
+      val superPropertyExpr = propInclusionAxiom.getSuperProperty
+      if (superPropertyExpr.getNamedProperty() == ofproperty) return true
+      else return false
     }
-    //(1) and (2)
-    if (pI._2.isInstanceOf[OWLObjectSomeValuesFrom])
+    //(1) x2=_and the right-hand side of I is exist P
+    //(2) x1=_and the right-hand side of I is exists P-
+    else if (pI.isInstanceOf[OWLSubClassOfAxiom])
     {
-      //(1) x2=_and the right-hand side of I is exist P
-      if (pI._2.asInstanceOf[OWLObjectSomeValuesFrom] == ofproperty && (!e2.isbound)) return true
-      
-      //(2)x1=_and the right-hand side of I is exists P-
-      if (pI._2.asInstanceOf[OWLObjectSomeValuesFrom].getProperty().getInverses(ontology).contains(ofproperty) && (!e1.isbound)) return true
+      val right = pI.asInstanceOf[OWLSubClassOfAxiom].getSuperClass
+      if (right.isInstanceOf[OWLObjectSomeValuesFrom]) {
+        val propertyExpr = right.asInstanceOf[OWLObjectSomeValuesFrom].getProperty
+        if (propertyExpr.getNamedProperty() == ofproperty)
+          if (propertyExpr.isInstanceOf[OWLObjectInverseOf]) return e1.isbound
+          else return e2.isbound
+        else return false
+      }
     }
     return false
   }
   
-  def apply(pI: (OWLObject,OWLObject), ontology: OWLOntology):Atom = {
-    if (pI._1.isInstanceOf[OWLClass]) {
-      return new Unary(pI._1.asInstanceOf[OWLClass],e1)
+  //check applicable before applying this!
+  def apply(pI: OWLAxiom, ontology: OWLOntology):Atom = {
+    
+    //if g = P(x1,x2) and either I = P1 < P or I = P1- < P- then gr(g,I) = P1(x1,x2)
+    //if g = P(x1,x2) and either I = P1 < P- or P- < P then gr(g,I) = P1(x2,x1)
+    if (pI.isInstanceOf[OWLSubObjectPropertyOfAxiom])
+    {
+      val propInclusionAxiom = pI.asInstanceOf[OWLSubObjectPropertyOfAxiom]
+      val rightPropertyExpr = propInclusionAxiom.getSuperProperty
+      val leftPropertyExpr = propInclusionAxiom.getSubProperty
+      return {
+      if (rightPropertyExpr.isInstanceOf[OWLObjectInverseOf] == leftPropertyExpr.isInstanceOf[OWLObjectInverseOf]) 
+        new Binary(leftPropertyExpr.getNamedProperty(),e1,e2)
+      else 
+        new Binary(leftPropertyExpr.getNamedProperty(),e2,e1)
+      }
     }
-    else if (pI._2.asInstanceOf[OWLObjectSomeValuesFrom] == ofproperty && (!e2.isbound)) {
-      return new Binary(pI._1.getObjectPropertiesInSignature().toList.get(0),e1,e2)
-    }
-    else if (pI._2.asInstanceOf[OWLObjectSomeValuesFrom].getProperty().getInverses(ontology).contains(ofproperty) && (!e1.isbound)) {
-      return new Binary(pI._1.getObjectPropertiesInSignature().toList.get(0),e2,e1)
-    }
-    else if (pI._2.isInstanceOf[OWLObjectProperty]) {
-      if (pI._2 == ofproperty) return new Binary(pI._1.getObjectPropertiesInSignature().toList.get(0),e1,e2)
-      //since it is applicable it has to be the inverse case
-      else return new Binary(pI._1.getObjectPropertiesInSignature().toList.get(0),e2,e1)
+
+    else if (pI.isInstanceOf[OWLSubClassOfAxiom])
+    {
+      val left = pI.asInstanceOf[OWLSubClassOfAxiom].getSubClass()
+      val right = pI.asInstanceOf[OWLSubClassOfAxiom].getSuperClass()
+      
+      //If g=P(x,_) and I= A < exist P  then gr(g,I)=A(x)
+      //If g=P(_,x) and I= A < exist P- then gr(g,I)=A(x)
+      if (left.isInstanceOf[OWLClass]) {
+        val rightPropertyExpr = right.asInstanceOf[OWLObjectSomeValuesFrom].getProperty()
+        val entry = if (rightPropertyExpr.isInstanceOf[OWLObjectInverseOf]) e2 else e1
+        return new Unary(left.asInstanceOf[OWLClass],entry)
+      }
+      
+      if (right.isInstanceOf[OWLObjectSomeValuesFrom] && left.isInstanceOf[OWLObjectSomeValuesFrom]) {
+        val rightPropertyExpr = right.asInstanceOf[OWLObjectSomeValuesFrom].getProperty()
+        val leftPropertyExpr = left.asInstanceOf[OWLObjectSomeValuesFrom].getProperty()
+        if (rightPropertyExpr.isInstanceOf[OWLObjectInverseOf] == leftPropertyExpr.isInstanceOf[OWLObjectInverseOf]) 
+          new Binary(leftPropertyExpr.getNamedProperty(),e1,e2)
+        else 
+          new Binary(leftPropertyExpr.getNamedProperty(),e2,e1)
+      }
     }
     return this
   }

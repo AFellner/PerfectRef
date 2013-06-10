@@ -1,6 +1,6 @@
 package structure
 
-class Query(head: Nary, body: Set[Atom]) {
+class Query(head: Nary, body: List[Atom]) {
   
   def contains(atom: Atom) = body.contains(atom)
   def replace(thisAtom: Atom, thatAtom: Atom):Query = {

@@ -20,7 +20,7 @@ object Test {
     val atom1 = new Unary(oneclass,x)
     val atom2 = new Binary(property,y,a)
     val atom3 = new Unary(oneclass,x)
-    val body = Set(atom1,atom2)
+    val body = List(atom1,atom2)
     val q = new Query(head,body)
     val body2 = List(atom2,atom1)
     val q2 = new Query(head,body)

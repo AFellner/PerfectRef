@@ -51,70 +51,40 @@ object PerfReformulator{
     }
   }
   
-
-  def goodSide(side: OWLObject):Boolean = {
-    if (side.isInstanceOf[OWLClass]) return true
-    else if(side.isInstanceOf[OWLObjectSomeValuesFrom]) return pureExist(side.asInstanceOf[OWLObjectSomeValuesFrom])
-    else if(side.isInstanceOf[OWLObjectProperty]) return true
-    else false
-  }
-  
-  def pureExist(exists: OWLObjectSomeValuesFrom):Boolean = {
-    if (exists.getClassesInSignature().isEmpty()) return true
-    else if ((exists.getClassesInSignature().toList.length == 1) && (exists.getClassesInSignature().toList.get(0).isTopEntity())) return true
-    else return false
-  }
-  
-  def isPI(axiom: OWLSubClassOfAxiom):Boolean = {
-    return goodSide(axiom.getSubClass()) && goodSide(axiom.getSuperClass())
-  }
-  
-  def readPIs(ontology: OWLOntology): List[(OWLObject,OWLObject)] = {
+//
+//  def goodSide(side: OWLObject):Boolean = {
+//    if (side.isInstanceOf[OWLClass]) return true
+//    else if(side.isInstanceOf[OWLObjectSomeValuesFrom]) return pureExist(side.asInstanceOf[OWLObjectSomeValuesFrom])
+//    else if(side.isInstanceOf[OWLObjectProperty]) return true
+//    else false
+//  }
+//  
+//  def pureExist(exists: OWLObjectSomeValuesFrom):Boolean = {
+//    if (exists.getClassesInSignature().isEmpty()) return true
+//    else if ((exists.getClassesInSignature().toList.length == 1) && (exists.getClassesInSignature().toList.get(0).isTopEntity())) return true
+//    else return false
+//  }
+//  
+//  def isPI(axiom: OWLSubClassOfAxiom):Boolean = {
+//    return goodSide(axiom.getSubClass()) && goodSide(axiom.getSuperClass())
+//  }
+//  
+  def readPIs(ontology: OWLOntology): List[OWLAxiom] = {
     val axioms = ontology.getAxioms().toList
-    var outList = new ListBuffer[(OWLObject,OWLObject)]
-    var addAxiom = false
-    axioms.foreach(a => 
-      if (isPI(a.asInstanceOf[OWLSubClassOfAxiom]))
-              outList.append((a.asInstanceOf[OWLSubClassOfAxiom].getSubClass,a.asInstanceOf[OWLSubClassOfAxiom].getSuperClass))
-    )
-    /*axioms.foreach(a => a.getAxiomType().getName() match {
-      case "SubClassOf" => {
-       a.toString().contains("Objj)
-        outList.append((a.getClassesInSignature().toList.get(0),a.getClassesInSignature().toList.get(1),0))
-      }
-      case "EquivalentClasses" => {
-        val classes = a.getClassesInSignature().toList
-        outList.append((classes.get(0),classes.get(1),0))
-        outList.append((classes.get(1),classes.get(0),0))
-      }
-      case "InverseObjectProperties" => {
-        val properties = a.getObjectPropertiesInSignature().toList
-        outList.append((properties.get(0),properties.get(1),2))
-        outList.append((properties.get(0),properties.get(1),3))
-        outList.append((properties.get(1),properties.get(0),3))
-        outList.append((properties.get(1),properties.get(0),3))
-      }
-      case "SubObjectPropertyOf" => {
-        val properties = a.getObjectPropertiesInSignature().toList
-        outList.append((properties.get(0),properties.get(1),1))
-      }
-      case "EquivalentObjectProperties" => {
-        val properties = a.getObjectPropertiesInSignature().toList
-        outList.append((properties.get(0),properties.get(1),1))
-        outList.append((properties.get(1),properties.get(0),1))
-      }
-      case "ObjectPropertyDomain" => {
-        val properties = a.getObjectPropertiesInSignature().toList
-        val classes = a.getClassesInSignature().toList
-        outList.append((properties.get(0),classes.get(0),4))
-      }
-      case "ObjectPropertyRange" => {
-        val properties = a.getObjectPropertiesInSignature().toList
-        val classes = a.getClassesInSignature().toList
-        outList.append((properties.get(0),classes.get(0),5))
-      }
-    }
-    )*/
-    outList.toList
+    axioms.filter(s => 
+     if (s.isInstanceOf[OWLSubClassOfAxiom]) {
+       val left = s.asInstanceOf[OWLSubClassOfAxiom].getSubClass
+       val right = s.asInstanceOf[OWLSubClassOfAxiom].getSuperClass
+       if (right.isInstanceOf[OWLObjectIntersectionOf]) false
+       else if (left.isInstanceOf[OWLDataSomeValuesFrom]) false
+       else if (right.isInstanceOf[OWLObjectComplementOf]) false
+       else if (right.isInstanceOf[OWLDataSomeValuesFrom]) false
+       else true
+     }
+     else if (s.isInstanceOf[OWLSubObjectPropertyOfAxiom])
+       true
+     else
+         false
+   )
   }
 }
