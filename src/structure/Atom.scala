@@ -6,8 +6,8 @@ import logic.PerfReformulator
 import scala.collection.JavaConversions._
 
 trait Atom {
-  def applicable(pI: OWLAxiom, ontology: OWLOntology):Boolean
-  def apply(pI: OWLAxiom, ontology: OWLOntology):Atom
+  def applicable(pI: OWLAxiom):Boolean
+  def apply(pI: OWLAxiom):Atom
 }
 
 class Unary(ofclass: OWLClass, e: Entry) extends Atom {
@@ -15,7 +15,7 @@ class Unary(ofclass: OWLClass, e: Entry) extends Atom {
   def getOWLClass:OWLClass = ofclass
   def getEntry = e
   def ==(other:Unary) = ofclass == other.getOWLClass && e == other.getEntry
-  def applicable(pI: OWLAxiom,ontology: OWLOntology):Boolean = {
+  def applicable(pI: OWLAxiom):Boolean = {
     if (pI.isInstanceOf[OWLSubClassOfAxiom]) {
       return pI.asInstanceOf[OWLSubClassOfAxiom].getSuperClass == ofclass
     }
@@ -25,7 +25,7 @@ class Unary(ofclass: OWLClass, e: Entry) extends Atom {
   
   //applicable has to be checked before calling this method
   //todo: deal with inverses properly!
-  def apply(pI: OWLAxiom, ontology: OWLOntology):Atom = {
+  def apply(pI: OWLAxiom):Atom = {
     if (pI.isInstanceOf[OWLSubClassOfAxiom]) {
       val left = pI.asInstanceOf[OWLSubClassOfAxiom].getSubClass
       if (left.isInstanceOf[OWLClass]) return new Unary(left.asInstanceOf[OWLClass],e)
@@ -48,7 +48,8 @@ class Binary(ofproperty: OWLObjectProperty, e1: Entry, e2: Entry) extends Atom {
   def getEntry1 = e1
   def getEntry2 = e2
   def ==(other:Binary) = (ofproperty == other.getOWLOBjectProperty) && (e1 == other.getEntry1) && (e2 == other.getEntry2)
-  def applicable(pI: OWLAxiom, ontology: OWLOntology):Boolean = {
+  
+  def applicable(pI: OWLAxiom):Boolean = {
     
     //(3)I is a role inclusion assertion and its right-hand side is either P or P-
     if (pI.isInstanceOf[OWLSubObjectPropertyOfAxiom])
@@ -75,7 +76,7 @@ class Binary(ofproperty: OWLObjectProperty, e1: Entry, e2: Entry) extends Atom {
   }
   
   //check applicable before applying this!
-  def apply(pI: OWLAxiom, ontology: OWLOntology):Atom = {
+  def apply(pI: OWLAxiom):Atom = {
     
     //if g = P(x1,x2) and either I = P1 < P or I = P1- < P- then gr(g,I) = P1(x1,x2)
     //if g = P(x1,x2) and either I = P1 < P- or P- < P then gr(g,I) = P1(x2,x1)
