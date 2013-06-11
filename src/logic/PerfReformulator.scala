@@ -27,27 +27,45 @@ object PerfReformulator{
   def createDatabase(ontology: OWLOntology) = {
     val classes = ontology.getClassesInSignature().toList
     val properties = ontology.getObjectPropertiesInSignature().toList
-    val dataproperties = ontology.getDataPropertiesInSignature().toList
+    //val dataproperties = ontology.getDataPropertiesInSignature().toList
     Database.forURL("jdbc:h2:~/ontology", driver = "org.h2.Driver") withSession {
       classes.foreach(c => 
-        Q.updateNA("create table if not exists "+c+" (entry varchar)"))
+        Q.updateNA("create table if not exists \""+c.toStringID()+"\" (entry1 varchar)"))
       properties.foreach(p =>
-        Q.updateNA("create table if not exists "+p+" (entry1 varchar, entry2 varchar)"))
-      dataproperties.foreach(dp =>
-        Q.updateNA("create table if not exists "+dp+" (entry1 varchar, entry2 varchar)"))
+        Q.updateNA("create table if not exists \""+p.toStringID()+"\" (entry1 varchar, entry2 varchar)"))
+//      dataproperties.foreach(dp =>
+//        Q.updateNA("create table if not exists "+dp+" (entry1 varchar, entry2 varchar)"))
     }
   }
   
   def insertAboxAssertions(ontology: OWLOntology) = {
     val aboxAxioms = ontology.getABoxAxioms(true).toList
     Database.forURL("jdbc:h2:~/ontology", driver = "org.h2.Driver") withSession {
-    aboxAxioms.foreach(s => s.getAxiomType().getName() match {
-      case "ClassAssertion" => Q.updateNA("insert into " + s.getClassesInSignature().toList.get(0) + " values ("+s.getIndividualsInSignature().toList.get(0)+")")
-      case "ObjectPropertyAssertion" => Q.updateNA("insert into " + s.getObjectPropertiesInSignature().toList.get(0) + " values ("+s.getIndividualsInSignature().toList.mkString(",")+")")
-      //case "DataPropertyAssertion" => Q.updateNA("insert into " + s.getDataPropertiesInSignature().toList.get(0) + " values ("+s.getIndividualsInSignature().toList.mkString(",")+")")
-      //case "DifferentIndividuals" => println("these are different: " +s.getIndividualsInSignature().toList.mkString(","))
-      case _ => println(s.getAxiomType().getName() + " not covered")
-    })
+//    aboxAxioms.foreach(s => s.getAxiomType().getName() match {
+//      case "ClassAssertion" => Q.updateNA("insert into " + s.getClassesInSignature().toList.get(0) + " values ("+s.getIndividualsInSignature().toList.get(0)+")")
+//      case "ObjectPropertyAssertion" => Q.updateNA("insert into " + s.getObjectPropertiesInSignature().toList.get(0) + " values ("+s.getIndividualsInSignature().toList.mkString(",")+")")
+//      //case "DataPropertyAssertion" => Q.updateNA("insert into " + s.getDataPropertiesInSignature().toList.get(0) + " values ("+s.getIndividualsInSignature().toList.mkString(",")+")")
+//      //case "DifferentIndividuals" => println("these are different: " +s.getIndividualsInSignature().toList.mkString(","))
+//      case _ => println(s.getAxiomType().getName() + " not covered")
+//    })
+    aboxAxioms.foreach(a => 
+     if (a.isInstanceOf[OWLClassAssertionAxiom])
+     {
+       val c = a.asInstanceOf[OWLClassAssertionAxiom].getClassExpression
+       if (c.isInstanceOf[OWLClass]) {
+	       val i = a.asInstanceOf[OWLClassAssertionAxiom].getIndividual
+	       Q.updateNA("insert into \"" + c.asInstanceOf[OWLClass].toStringID + "\" values (\'"+i.toStringID()+"\')")
+     	}
+     }
+     else if (a.isInstanceOf[OWLObjectPropertyAssertionAxiom])
+     {
+         val s = a.asInstanceOf[OWLObjectPropertyAssertionAxiom].getSubject
+         val o = a.asInstanceOf[OWLObjectPropertyAssertionAxiom].getObject
+         val p = a.asInstanceOf[OWLObjectPropertyAssertionAxiom].getProperty.getNamedProperty()
+         Q.updateNA("insert into \"" + p.toStringID + "\" values (\'"+s.toStringID + "\', \'" + o.toStringID +"\')")
+     }
+    
+    )  
     }
   }
   

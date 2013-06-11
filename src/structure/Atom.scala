@@ -8,6 +8,7 @@ import scala.collection.JavaConversions._
 trait Atom {
   def applicable(pI: OWLAxiom):Boolean
   def apply(pI: OWLAxiom):Atom
+  def getExprName:String
 }
 
 class Unary(ofclass: OWLClass, e: Entry) extends Atom {
@@ -22,6 +23,7 @@ class Unary(ofclass: OWLClass, e: Entry) extends Atom {
     else
       return false
   }
+  def getExprName:String = ofclass.toStringID
   
   //applicable has to be checked before calling this method
   //todo: deal with inverses properly!
@@ -48,6 +50,7 @@ class Binary(ofproperty: OWLObjectProperty, e1: Entry, e2: Entry) extends Atom {
   def getEntry1 = e1
   def getEntry2 = e2
   def ==(other:Binary) = (ofproperty == other.getOWLOBjectProperty) && (e1 == other.getEntry1) && (e2 == other.getEntry2)
+  def getExprName:String = ofproperty.toStringID()
   
   def applicable(pI: OWLAxiom):Boolean = {
     
