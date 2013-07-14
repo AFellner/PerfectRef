@@ -6,16 +6,23 @@ import logic.PerfReformulator
 import scala.collection.JavaConversions._
 
 trait Atom {
+  val arity = 0
   def applicable(pI: OWLAxiom):Boolean
   def apply(pI: OWLAxiom):Atom
   def getExprName:String
+  def ==(other:Atom):Boolean = other match{
+    case other:Unary if (this.isInstanceOf[Unary]) => this.asInstanceOf[Unary] == other.asInstanceOf[Unary]
+    case other:Binary if (this.isInstanceOf[Binary]) => this.asInstanceOf[Binary] == other.asInstanceOf[Binary]
+    case _ => false    
+  }
 }
 
 class Unary(ofclass: OWLClass, e: Entry) extends Atom {
-  override def toString() = ofclass.toString + "("+e+")"
+  override val arity = 1
+  override def toString() = ofclass.toStringID.split("#")(1) + "("+e+")"
   def getOWLClass:OWLClass = ofclass
-  def getEntry = e
-  def ==(other:Unary) = ofclass == other.getOWLClass && e == other.getEntry
+  def getEntry:Entry = e
+  def ==(other:Unary):Boolean = (ofclass == other.getOWLClass && e == other.getEntry)
   def applicable(pI: OWLAxiom):Boolean = {
     if (pI.isInstanceOf[OWLSubClassOfAxiom]) {
       return pI.asInstanceOf[OWLSubClassOfAxiom].getSuperClass == ofclass
@@ -45,12 +52,15 @@ class Unary(ofclass: OWLClass, e: Entry) extends Atom {
 }
 
 class Binary(ofproperty: OWLObjectProperty, e1: Entry, e2: Entry) extends Atom {
-  override def toString() = ofproperty.toString + "("+e1+","+e2+")"
+  override val arity = 2
+  override def toString() = ofproperty.toStringID.split("#")(1) + "("+e1+","+e2+")"
   def getOWLOBjectProperty:OWLObjectProperty = ofproperty
   def getEntry1 = e1
   def getEntry2 = e2
-  def ==(other:Binary) = (ofproperty == other.getOWLOBjectProperty) && (e1 == other.getEntry1) && (e2 == other.getEntry2)
-  def getExprName:String = ofproperty.toStringID()
+  def ==(other:Binary):Boolean = (ofproperty == other.getOWLOBjectProperty) && (e1 == other.getEntry1) && (e2 == other.getEntry2)
+  def getExprName:String = ofproperty.toStringID
+  
+  def all_entries_bound:Boolean = e1.isbound && e2.isbound
   
   def applicable(pI: OWLAxiom):Boolean = {
     
@@ -126,5 +136,14 @@ class Nary(name:String, e: List[Var]){
   override def toString() = name + "(" + e.mkString(",") + ")"
   def getName = name
   def getEntries = e
-  def ==(other: Nary) = other.getName == name && other.getEntries == e
+  
+  // method to compare two lists of variables; the regular '==' on lists doesn't seem to work
+  def compare(e1:List[Var], e2:List[Var]):Boolean = (e1, e2) match {
+    case (e1, e2) if (e1.length != e2.length) => false
+    case (List(), List()) => true
+    case (e1, e2)  if (e1.head == e2.head) => compare(e1.tail, e2.tail)
+    case _ => false    
+  }    
+  def ==(other: Nary) = other.getName == name && compare(e, other.getEntries)
+  def contains_variable(v:Var) = e.count(_ == v) > 0 
 }
